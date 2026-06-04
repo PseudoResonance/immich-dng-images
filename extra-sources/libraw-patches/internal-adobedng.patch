@@ -1,0 +1,57 @@
+diff --git a/libraw/libraw.h b/libraw/libraw.h
+index a1d23056..34805026 100644
+--- a/libraw/libraw.h
++++ b/libraw/libraw.h
+@@ -348,6 +348,7 @@ public:
+   virtual int adobe_coeff(unsigned, const char *, int internal_only = 0);
+ 
+   void set_dng_host(void *);
++  void create_dng_host();
+ 
+ protected:
+   static void *memmem(char *haystack, size_t haystacklen, char *needle,
+diff --git a/src/decoders/unpack.cpp b/src/decoders/unpack.cpp
+index cb9e341e..9afd9d4b 100644
+--- a/src/decoders/unpack.cpp
++++ b/src/decoders/unpack.cpp
+@@ -87,6 +87,8 @@ int LibRaw::unpack(void)
+     imgdata.rawdata.float3_image = 0;
+ 
+ #ifdef USE_DNGSDK
++    if (!dnghost)
++      create_dng_host();
+     if (imgdata.idata.dng_version && dnghost
+         && libraw_internal_data.unpacker_data.tiff_samples != 2  // Fuji SuperCCD; it is better to detect is more rigid way
+         && valid_for_dngsdk() && load_raw != &LibRaw::pentax_4shot_load_raw)
+diff --git a/src/integration/dngsdk_glue.cpp b/src/integration/dngsdk_glue.cpp
+index a67f9347..d864640f 100644
+--- a/src/integration/dngsdk_glue.cpp
++++ b/src/integration/dngsdk_glue.cpp
+@@ -138,6 +138,8 @@ int LibRaw::valid_for_dngsdk()
+ 	  && load_raw == &LibRaw::lossy_dng_load_raw
+ 	  )
+   {
++      if (!dnghost)
++        create_dng_host();
+       if (!dnghost)
+           return 0;
+ 	  try
+@@ -209,6 +211,8 @@ int LibRaw::valid_for_dngsdk()
+ int LibRaw::try_dngsdk()
+ {
+ #ifdef USE_DNGSDK
++  if (!dnghost)
++    create_dng_host();
+   if (!dnghost)
+     return LIBRAW_UNSPECIFIED_ERROR;
+ 
+@@ -511,3 +515,9 @@ void LibRaw::set_dng_host(void *p)
+   dnghost = p;
+ #endif
+ }
++void LibRaw::create_dng_host()
++{
++#ifdef USE_DNGSDK
++  dnghost = new dng_host;
++#endif
++}

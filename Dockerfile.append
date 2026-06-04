@@ -1,0 +1,43 @@
+FROM libjxl AS libdng
+
+COPY sources/libdng.json sources/libxmp.json sources/libdng.sh ./
+COPY sources/libdng-patches/ ./libdng-patches/
+RUN ./libdng.sh
+
+FROM libdng AS libraw
+
+COPY sources/libraw.json sources/libraw.sh ./
+COPY sources/libraw-patches/ ./libraw-patches/
+RUN ./libraw.sh
+
+FROM libraw AS imagemagick
+
+COPY --from=libheif /usr/local/lib/ /usr/local/lib/libheif/
+COPY --from=libheif /usr/local/include/libheif/ /usr/local/include/libheif/
+
+COPY --from=libjxl /usr/local/lib/ /usr/local/lib/libjxl/
+COPY --from=libjxl /usr/local/include/jxl/ /usr/local/include/jxl/
+COPY --from=libjxl /usr/local/include/jconfig.h /usr/local/include/jmorecfg.h /usr/local/include/jpeglib.h /usr/local/include/
+
+# COPY resolves symlinks unless copying the enclosing folder, so this is a workaround to get the correct result
+RUN cp -r /usr/local/lib/libheif/libheif* /usr/local/lib/libjxl/libjxl* /usr/local/lib/libjxl/libjpeg* /usr/local/lib && \
+  mv /usr/local/lib/libheif/pkgconfig/* /usr/local/lib/libjxl/pkgconfig/* /usr/local/lib/pkgconfig && \
+  rm -r /usr/local/lib/libheif /usr/local/lib/libjxl
+
+COPY sources/imagemagick.json sources/imagemagick.sh ./
+RUN ./imagemagick.sh
+
+FROM imagemagick AS libvips
+
+COPY sources/libvips.json sources/libvips.sh ./
+RUN ./libvips.sh
+
+# Generate edited image
+
+FROM ghcr.io/immich-app/immich-server:${IMMICH_TAG}
+
+COPY --from=libvips /usr/local/lib/ /usr/local/lib/
+COPY --from=libvips /usr/local/bin/vips* /usr/local/bin/
+COPY --from=libvips /usr/local/include/vips/ /usr/local/include/vips/
+
+RUN ldconfig /usr/local/lib
